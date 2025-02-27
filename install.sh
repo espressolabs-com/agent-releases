@@ -72,7 +72,6 @@ EspressoLabs Agent Installer
 Usage: [NONINTERACTIVE=1] [CI=1] install.sh [options]
     --backend-host   The backend that the agent will connect to.
     --token          The token that the agent will use to authenticate.
-    --nightly        Install the nightly/devel version of the agent.
     -h, --help       Display this message.
     NONINTERACTIVE   Install without prompting for user input
     CI               Install in CI mode (e.g. do not prompt for user input)
@@ -98,14 +97,6 @@ while [[ $# -gt 0 ]]; do
   --token)
     TOKEN="$2"
     shift 2
-    ;;
-  --nightly)
-    NIGHTLY=1
-    shift
-    ;;
-  --devel)
-    NIGHTLY=1
-    shift
     ;;
   *)
     warn "Unrecognized option: '$1'"
@@ -171,10 +162,6 @@ which() {
 }
 
 UNAME_MACHINE="$(/usr/bin/uname -m)"
-CHOWN=$(which chown)
-CHMOD=$(which chmod)
-CHGRP=$(which chgrp)
-STAT_PRINTF=("/usr/bin/stat" "-f")
 INSTALLER=$(which installer)
 
 ohai "Using the following values:"
@@ -306,6 +293,7 @@ test_curl() {
   version_ge "$(major_minor "${curl_name_and_version##* }")" "$(major_minor "${REQUIRED_CURL_VERSION}")"
 }
 
+# shellcheck disable=SC2016
 ohai 'Checking for `sudo` access (which may request your password)...'
 
 if [[ "${EUID:-${UID}}" != "0" ]] && ! have_sudo_access; then
@@ -341,7 +329,7 @@ EOABORT
 fi
 
 get_latest_release() {
-  pkg_asset_url=$(curl --silent $auth_header "https://api.github.com/repos/espressolabs-com/agent-releases/releases/latest" |
+  pkg_asset_url=$(curl --silent "https://api.github.com/repos/espressolabs-com/agent-releases/releases/latest" |
     grep -o '"browser_download_url": "[^"]*pkg"' |
     sed -E 's/.*"browser_download_url": "(.*)".*/\1/')
 
@@ -363,7 +351,7 @@ get_latest_release() {
 ohai "Downloading the latest release..."
 get_latest_release
 
-execute_sudo "installer" "-pkg" "$LOCAL_PKG_PATH" "-target" "/"
+execute_sudo "$INSTALLER" "-pkg" "$LOCAL_PKG_PATH" "-target" "/"
 
 execute_sudo "/Library/EspressoLabs/espresso-agent/$AGENT_VERSION/reconfigure.sh" "$BACKEND_HOST" "$TOKEN"
 

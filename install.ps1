@@ -26,6 +26,20 @@ function ohai {
     Write-Host "==>" -ForegroundColor Blue -NoNewline
     Write-Host " $message"
 }
+function Test-IsAdmin {
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object System.Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+ohai "Checking for required privileges..."
+# Check if the script is running with administrator privileges
+if (-not (Test-IsAdmin)) {
+    Write-Host "This script requires administrator privileges!" -ForegroundColor Red
+    exit 1
+} else {
+    Write-Host "    Administrator privileges confirmed!" -ForegroundColor Green
+}
 
 ohai "Installing the EspressoLabs Agent..."
 
@@ -77,6 +91,8 @@ $tmpMsiPath = Join-Path $tmpDir $asset.name
 ohai "Downloading the MSI asset..."
 $ProgressPreference = 'Continue'
 Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tmpMsiPath
+
+Unblock-File -Path $tmpMsiPath
 
 function Uninstall-ExistingVersion {
     ohai "Checking for previous installation..."

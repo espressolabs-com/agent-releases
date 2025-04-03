@@ -1,4 +1,3 @@
-
 param(
     [string]$backendHost,
     [string]$token
@@ -161,5 +160,51 @@ if ($installedVersion -match "\b$expectedVersion\b") {
     exit 1
 }
 
+ohai "Finding latest chrome-extension version..."
+
+$extensionManifestUrl = "https://expresso-agent-1.s3.us-east-1.amazonaws.com/chrome-extension/latest"
+$extensionManifest = Invoke-RestMethod -Uri $extensionManifestUrl
+$extensionDownloadUrl = $extensionManifest.Trim()
+$extensionFileName = $extensionDownloadUrl.Split('/')[-1]
+$extensionDownloadPath = Join-Path $tmpDir $extensionFileName
+
+Write-Host "Using the following values:"
+Write-Host "    Chrome extension download URL: $extensionDownloadUrl"
+Write-Host "    Chrome extension download path: $extensionDownloadPath"
+
+ohai "Downloading chrome-extension..."
+Invoke-WebRequest -Uri $extensionDownloadUrl -OutFile $extensionDownloadPath
+
+ohai "Installing chrome-extension..."
+$extensionInstallPath = Join-Path $env:ProgramFiles "EspressoLabs\chrome-extension"
+
+$tempExtractPath = Join-Path $tmpDir "temp-extract"
+Expand-Archive -Path $extensionDownloadPath -DestinationPath $tempExtractPath -Force | Out-Null
+
+# Get the nested chrome-extension directory
+$nestedFolder = Join-Path $tempExtractPath "chrome-extension"
+if (-not (Test-Path $nestedFolder)) {
+    Write-Error "Expected chrome-extension directory not found in zip"
+    exit 1
+}
+
+# Create the extension directory if it doesn't exist
+if (-not (Test-Path $extensionInstallPath)) {
+    New-Item -ItemType Directory -Path $extensionInstallPath -Force
+}
+
+# Copy all contents from the nested directory to the final location
+Get-ChildItem -Path $nestedFolder | Copy-Item -Destination $extensionInstallPath -Recurse -Force
+
+# Clean up temp directory
+Remove-Item -Path $tempExtractPath -Recurse -Force
+
 ohai "Installation completed successfully!"
 Write-Host "Installation log is available at: $logFile"
+
+ohai "You can now enable the Chrome Extension"
+Write-Host "    To enable the extension:"
+Write-Host "     1. Open Chrome and navigate to 'chrome://extensions/'."
+Write-Host "     2. Enable 'Developer mode' (toggle in the top-right corner)."
+Write-Host "     3. Click 'Load unpacked' and select the folder: $extensionInstallPath"
+

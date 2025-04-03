@@ -378,4 +378,32 @@ ohai "Checking espresso-agent version..."
 check_espresso_agent_version "$AGENT_VERSION"
 
 ohai "Installation successful!"
+
+get_latest_extension() {
+  extension_url=$(curl --silent https://expresso-agent-1.s3.us-east-1.amazonaws.com/chrome-extension/latest)
+
+  filename=$(basename "$extension_url")
+  local_extension_path="/tmp/$filename"
+  EXTENSION_VERSION=$(echo "$extension_url" | sed -E 's/.*-([0-9]+\.[0-9]+\.[0-9]+)\.zip/\1/')
+  EXTENSION_DESTINATION="/Library/Application Support/EspressoLabs"
+
+  echo "Downloading extension: $extension_url"
+  curl -L --progress-bar "$extension_url" -o "$local_extension_path"
+  echo "Downloaded to $local_extension_path"
+
+  execute_sudo mkdir -p "$EXTENSION_DESTINATION"
+  execute_sudo unzip -qq -o "$local_extension_path" -d "$EXTENSION_DESTINATION"
+  execute_sudo chmod -R 777 "$EXTENSION_DESTINATION/chrome-extension"
+}
+
+ohai "Downloading the latest extension..."
+get_latest_extension
+
+ohai "You can now enable the Chrome Extension"
+
+echo "    To enable the extension:"
+echo "     1. Open Chrome and navigate to 'chrome://extensions/'."
+echo "     2. Enable 'Developer mode' (toggle in the top-right corner)."
+echo "     3. Click 'Load unpacked' and select the folder: $EXTENSION_DESTINATION/chrome-extension"
+
 ring_bell

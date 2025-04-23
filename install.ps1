@@ -67,7 +67,18 @@ $response = Invoke-RestMethod -Uri $apiUrl
 $version = $response.tag_name -replace '^v', ''
 
 # Extract version and asset name based on architecture
-$arch = if ([System.Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
+$envArch = $env:PROCESSOR_ARCHITECTURE
+$wow64Arch = $env:PROCESSOR_ARCHITEW6432
+
+if ($envArch -eq "ARM64" -or $wow64Arch -eq "ARM64") {
+    $arch = "arm64"
+} elseif ($envArch -eq "AMD64" -or $wow64Arch -eq "AMD64") {
+    $arch = "x64"
+} elseif ($envArch -eq "x86") {
+    $arch = "x86"
+} else {
+    $arch = "unknown"
+}
 
 # Find the correct MSI asset from the release
 $asset = $response.assets | Where-Object { $_.name -match "-$arch\.msi$" }

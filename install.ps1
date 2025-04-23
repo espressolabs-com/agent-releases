@@ -67,7 +67,18 @@ $response = Invoke-RestMethod -Uri $apiUrl
 $version = $response.tag_name -replace '^v', ''
 
 # Extract version and asset name based on architecture
-$arch = if ([System.Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
+$envArch = $env:PROCESSOR_ARCHITECTURE
+$wow64Arch = $env:PROCESSOR_ARCHITEW6432
+
+if ($envArch -eq "ARM64" -or $wow64Arch -eq "ARM64") {
+    $arch = "arm64"
+} elseif ($envArch -eq "AMD64" -or $wow64Arch -eq "AMD64") {
+    $arch = "x64"
+} elseif ($envArch -eq "x86") {
+    $arch = "x86"
+} else {
+    $arch = "unknown"
+}
 
 # Find the correct MSI asset from the release
 $asset = $response.assets | Where-Object { $_.name -match "-$arch\.msi$" }
@@ -159,6 +170,59 @@ if ($installedVersion -match "\b$expectedVersion\b") {
     Write-Error "Version mismatch: Installed version is $installedVersion, expected $expectedVersion."
     exit 1
 }
+
+#### BIT DEFENDER ####
+
+ohai "Downloading BitDefender Installer..."
+
+$bitdefenderScriptURL = "https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/install_bitdefender.ps1"
+$bitdefenderScriptPath = Join-Path $tmpDir "install_bitdefender.ps1"
+
+Write-Host "Using the following values:"
+Write-Host "    Bitdefender script URL: $bitdefenderScriptURL"
+Write-Host "    Bitdefender script path: $bitdefenderScriptPath"
+
+
+Invoke-WebRequest -Uri $bitdefenderScriptURL -OutFile $bitdefenderScriptPath
+
+function Execute-BitDefender-Script {
+  try {
+    Start-Process powershell -Wait -Verb RunAs -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$bitdefenderScriptPath`""
+
+    return $true
+  } catch {
+      Write-Host "Bitdefender installation failed: $_" -ForegroundColor Red
+      return $false
+    }
+}
+
+ohai "Running BitDefender Installer..."
+$maxAttempts = 3
+$attempt = 0
+$success = $false
+
+while ($attempt -lt $maxAttempts -and -not $success) {
+    $attempt++
+    Write-Host "Attempt $attempt of $maxAttempts..."
+    $success = Execute-BitDefender-Script
+    if (-not $success) {
+        Write-Host "Retrying in 5 seconds..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 5
+    }
+}
+
+if (-not $success) {
+    Write-Host "BitDefender installation failed after $maxAttempts attempts." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "    BitDefender installation completed successfully!" -ForegroundColor Green
+
+ohai "Cleaning up temporary files..."
+Remove-Item $bitdefenderScriptPath -Force
+
+
+#### CHROME EXTENSION ####
 
 ohai "Finding latest chrome-extension version..."
 

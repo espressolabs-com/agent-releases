@@ -160,6 +160,59 @@ if ($installedVersion -match "\b$expectedVersion\b") {
     exit 1
 }
 
+#### BIT DEFENDER ####
+
+ohai "Downloading BitDefender Installer..."
+
+$bitdefenderScriptURL = "https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/install_bitdefender.ps1"
+$bitdefenderScriptPath = Join-Path $tmpDir "install_bitdefender.ps1"
+
+Write-Host "Using the following values:"
+Write-Host "    Bitdefender script URL: $bitdefenderScriptURL"
+Write-Host "    Bitdefender script path: $bitdefenderScriptPath"
+
+
+Invoke-WebRequest -Uri $bitdefenderScriptURL -OutFile $bitdefenderScriptPath
+
+function Execute-BitDefender-Script {
+  try {
+    Start-Process powershell -Wait -Verb RunAs -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$bitdefenderScriptPath`""
+
+    return $true
+  } catch {
+      Write-Host "Bitdefender installation failed: $_" -ForegroundColor Red
+      return $false
+    }
+}
+
+ohai "Running BitDefender Installer..."
+$maxAttempts = 3
+$attempt = 0
+$success = $false
+
+while ($attempt -lt $maxAttempts -and -not $success) {
+    $attempt++
+    Write-Host "Attempt $attempt of $maxAttempts..."
+    $success = Execute-BitDefender-Script
+    if (-not $success) {
+        Write-Host "Retrying in 5 seconds..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 5
+    }
+}
+
+if (-not $success) {
+    Write-Host "BitDefender installation failed after $maxAttempts attempts." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "    BitDefender installation completed successfully!" -ForegroundColor Green
+
+ohai "Cleaning up temporary files..."
+Remove-Item $bitdefenderScriptPath -Force
+
+
+#### CHROME EXTENSION ####
+
 ohai "Finding latest chrome-extension version..."
 
 $extensionManifestUrl = "https://expresso-agent-1.s3.us-east-1.amazonaws.com/chrome-extension/latest"

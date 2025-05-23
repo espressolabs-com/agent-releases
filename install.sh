@@ -72,6 +72,8 @@ EspressoLabs Agent Installer
 Usage: [NONINTERACTIVE=1] [CI=1] install.sh [options]
     --backend-host   The backend that the agent will connect to.
     --token          The token that the agent will use to authenticate.
+    --extension      Install the Chrome Extension
+    --no-jq          Do not install jq (default: install jq)
     -h, --help       Display this message.
     NONINTERACTIVE   Install without prompting for user input
     CI               Install in CI mode (e.g. do not prompt for user input)
@@ -97,6 +99,14 @@ while [[ $# -gt 0 ]]; do
   --token)
     TOKEN="$2"
     shift 2
+    ;;
+  --no-jq)
+    NO_JQ=1
+    shift
+    ;;
+  --extension)
+    INSTALL_EXTENSION=1
+    shift
     ;;
   *)
     warn "Unrecognized option: '$1'"
@@ -313,6 +323,12 @@ fi
 ohai "This script will install:"
 echo "    - espresso-agent"
 echo "    - com.espressolabs.agent service"
+if [[ -z "${NO_JQ-}" ]]; then
+  echo "    - jq"
+fi
+if [[ -n "${INSTALL_EXTENSION-}" ]]; then
+  echo "    - Chrome Extension"
+fi
 
 if [[ -z "${NONINTERACTIVE-}" ]]; then
   ring_bell
@@ -347,6 +363,37 @@ get_latest_release() {
     abort "No asset found for the latest release."
   fi
 }
+
+JQ_PATH="/usr/local/bin/jq"
+get_latest_jq() {
+  ARCH=$(uname -m)
+
+  if [ "$ARCH" == "x86_64" ]; then
+    JQ_URL="https://github.com/jqlang/jq/releases/latest/download/jq-macos-amd64"
+  elif [ "$ARCH" == "arm64" ]; then
+    JQ_URL="https://github.com/jqlang/jq/releases/latest/download/jq-macos-arm64"
+  fi
+  TMP_JQ_PATH="/tmp/jq"
+
+  echo "Installing jq from: $JQ_URL"
+
+  curl -L --progress-bar "$JQ_URL" -o "$TMP_JQ_PATH"
+  execute_sudo mkdir -p "$(dirname "$JQ_PATH")"
+  execute_sudo mv "$TMP_JQ_PATH" "$JQ_PATH"
+  execute_sudo chmod +x "$JQ_PATH"
+
+  echo "Installed jq to $JQ_PATH"
+}
+
+if [[ -z "${NO_JQ-}" ]]; then
+  ohai "Checking for jq..."
+  if [[ ! -f "$JQ_PATH" ]]; then
+    get_latest_jq
+  else
+    echo "JQ found in path"
+  fi
+
+fi
 
 ohai "Downloading the latest release..."
 get_latest_release
@@ -396,14 +443,16 @@ get_latest_extension() {
   execute_sudo chmod -R 777 "$EXTENSION_DESTINATION/chrome-extension"
 }
 
-ohai "Downloading the latest extension..."
-get_latest_extension
+if [[ -n "${INSTALL_EXTENSION-}" ]]; then
+  ohai "Downloading the latest extension..."
+  get_latest_extension
 
-ohai "You can now enable the Chrome Extension"
+  ohai "You can now enable the Chrome Extension"
 
-echo "    To enable the extension:"
-echo "     1. Open Chrome and navigate to 'chrome://extensions/'."
-echo "     2. Enable 'Developer mode' (toggle in the top-right corner)."
-echo "     3. Click 'Load unpacked' and select the folder: $EXTENSION_DESTINATION/chrome-extension"
+  echo "    To enable the extension:"
+  echo "     1. Open Chrome and navigate to 'chrome://extensions/'."
+  echo "     2. Enable 'Developer mode' (toggle in the top-right corner)."
+  echo "     3. Click 'Load unpacked' and select the folder: $EXTENSION_DESTINATION/chrome-extension"
 
+fi
 ring_bell

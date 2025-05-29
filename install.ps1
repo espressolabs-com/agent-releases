@@ -186,6 +186,19 @@ Write-Host "    Bitdefender script path: $bitdefenderScriptPath"
 Invoke-WebRequest -Uri $bitdefenderScriptURL -OutFile $bitdefenderScriptPath
 
 function Execute-BitDefender-Script {
+
+  $paths = @(
+      "$env:ProgramFiles(x86)\EspressoLabs\oemsdk.dll",
+      "$env:ProgramFiles\EspressoLabs\oemsdk.dll"
+  )
+
+  foreach ($path in $paths) {
+    if (Test-Path $path) {
+      Write-Host "Bitdefender is already installed at $path. Skipping installation." -ForegroundColor Green
+      return $true
+    }
+  }
+
   try {
     Start-Process powershell -Wait -Verb RunAs -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$bitdefenderScriptPath`""
 

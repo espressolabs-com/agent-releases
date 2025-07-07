@@ -1,6 +1,8 @@
 param(
     [string]$backendHost,
-    [string]$token
+    [string]$token,
+    [switch]$no_bitdefender,
+    [switch]$no_chrome_extension
 )
 # Disable StrictMode in this script
 Set-StrictMode -Off
@@ -12,6 +14,8 @@ if ($args -contains '--help') {
     Write-Host "Parameters:"
     Write-Host "  -backendHost <backendHost>  The backend host to pass to the installer"
     Write-Host "  -token <token>              The installation token required by the installer"
+    Write-Host "  -no_bitdefender             Skip BitDefender installation"
+    Write-Host "  -no_chrome_extension        Skip Chrome extension installation"
     Write-Host ""
     Write-Host "This script downloads the latest release from the espressolabs-com/agent-releases GitHub repo,"
     Write-Host "installs the agent using the provided parameters, and verifies the installed version."
@@ -173,115 +177,122 @@ if ($installedVersion -match "\b$expectedVersion\b") {
 
 #### BIT DEFENDER ####
 
-ohai "Downloading BitDefender Installer..."
+if (-not $no_bitdefender) {
+  ohai "Downloading BitDefender Installer..."
 
-$bitdefenderScriptURL = "https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/install_bitdefender.ps1"
-$bitdefenderScriptPath = Join-Path $tmpDir "install_bitdefender.ps1"
+  $bitdefenderScriptURL = "https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/install_bitdefender.ps1"
+  $bitdefenderScriptPath = Join-Path $tmpDir "install_bitdefender.ps1"
 
-Write-Host "Using the following values:"
-Write-Host "    Bitdefender script URL: $bitdefenderScriptURL"
-Write-Host "    Bitdefender script path: $bitdefenderScriptPath"
+  Write-Host "Using the following values:"
+  Write-Host "    Bitdefender script URL: $bitdefenderScriptURL"
+  Write-Host "    Bitdefender script path: $bitdefenderScriptPath"
 
 
-Invoke-WebRequest -Uri $bitdefenderScriptURL -OutFile $bitdefenderScriptPath
+  Invoke-WebRequest -Uri $bitdefenderScriptURL -OutFile $bitdefenderScriptPath
 
-function Execute-BitDefender-Script {
+  function Execute-BitDefender-Script {
 
-  $paths = @(
-      "$env:ProgramFiles(x86)\EspressoLabs\oemsdk.dll",
-      "$env:ProgramFiles\EspressoLabs\oemsdk.dll"
-  )
+    $paths = @(
+        "$env:ProgramFiles(x86)\EspressoLabs\oemsdk.dll",
+        "$env:ProgramFiles\EspressoLabs\oemsdk.dll"
+    )
 
-  foreach ($path in $paths) {
-    if (Test-Path $path) {
-      Write-Host "Bitdefender is already installed at $path. Skipping installation." -ForegroundColor Green
-      return $true
+    foreach ($path in $paths) {
+      if (Test-Path $path) {
+        Write-Host "Bitdefender is already installed at $path. Skipping installation." -ForegroundColor Green
+        return $true
+      }
     }
+
+    try {
+      Start-Process powershell -Wait -Verb RunAs -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$bitdefenderScriptPath`""
+
+      return $true
+    } catch {
+        Write-Host "Bitdefender installation failed: $_" -ForegroundColor Red
+        return $false
+      }
   }
 
-  try {
-    Start-Process powershell -Wait -Verb RunAs -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$bitdefenderScriptPath`""
+  ohai "Running BitDefender Installer..."
+  $maxAttempts = 3
+  $attempt = 0
+  $success = $false
 
-    return $true
-  } catch {
-      Write-Host "Bitdefender installation failed: $_" -ForegroundColor Red
-      return $false
-    }
-}
+  while ($attempt -lt $maxAttempts -and -not $success) {
+      $attempt++
+      Write-Host "Attempt $attempt of $maxAttempts..."
+      $success = Execute-BitDefender-Script
+      if (-not $success) {
+          Write-Host "Retrying in 5 seconds..." -ForegroundColor Yellow
+          Start-Sleep -Seconds 5
+      }
+  }
 
-ohai "Running BitDefender Installer..."
-$maxAttempts = 3
-$attempt = 0
-$success = $false
+  if (-not $success) {
+      Write-Host "BitDefender installation failed after $maxAttempts attempts." -ForegroundColor Red
+      exit 1
+  }
 
-while ($attempt -lt $maxAttempts -and -not $success) {
-    $attempt++
-    Write-Host "Attempt $attempt of $maxAttempts..."
-    $success = Execute-BitDefender-Script
-    if (-not $success) {
-        Write-Host "Retrying in 5 seconds..." -ForegroundColor Yellow
-        Start-Sleep -Seconds 5
-    }
-}
+  Write-Host "    BitDefender installation completed successfully!" -ForegroundColor Green
 
-if (-not $success) {
-    Write-Host "BitDefender installation failed after $maxAttempts attempts." -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "    BitDefender installation completed successfully!" -ForegroundColor Green
-
-ohai "Cleaning up temporary files..."
-Remove-Item $bitdefenderScriptPath -Force
-
+  ohai "Cleaning up temporary files..."
+  Remove-Item $bitdefenderScriptPath -Force
+} else {
+    ohai "Skipping BitDefender installation as per user request."
+  }
 
 #### CHROME EXTENSION ####
 
-ohai "Finding latest chrome-extension version..."
+if (-not $no_chrome_extension) {
+  ohai "Finding latest chrome-extension version..."
 
-$extensionManifestUrl = "https://expresso-agent-1.s3.us-east-1.amazonaws.com/chrome-extension/latest"
-$extensionManifest = Invoke-RestMethod -Uri $extensionManifestUrl
-$extensionDownloadUrl = $extensionManifest.Trim()
-$extensionFileName = $extensionDownloadUrl.Split('/')[-1]
-$extensionDownloadPath = Join-Path $tmpDir $extensionFileName
+  $extensionManifestUrl = "https://expresso-agent-1.s3.us-east-1.amazonaws.com/chrome-extension/latest"
+  $extensionManifest = Invoke-RestMethod -Uri $extensionManifestUrl
+  $extensionDownloadUrl = $extensionManifest.Trim()
+  $extensionFileName = $extensionDownloadUrl.Split('/')[-1]
+  $extensionDownloadPath = Join-Path $tmpDir $extensionFileName
 
-Write-Host "Using the following values:"
-Write-Host "    Chrome extension download URL: $extensionDownloadUrl"
-Write-Host "    Chrome extension download path: $extensionDownloadPath"
+  Write-Host "Using the following values:"
+  Write-Host "    Chrome extension download URL: $extensionDownloadUrl"
+  Write-Host "    Chrome extension download path: $extensionDownloadPath"
 
-ohai "Downloading chrome-extension..."
-Invoke-WebRequest -Uri $extensionDownloadUrl -OutFile $extensionDownloadPath
+  ohai "Downloading chrome-extension..."
+  Invoke-WebRequest -Uri $extensionDownloadUrl -OutFile $extensionDownloadPath
 
-ohai "Installing chrome-extension..."
-$extensionInstallPath = Join-Path $env:ProgramFiles "EspressoLabs\chrome-extension"
+  ohai "Installing chrome-extension..."
+  $extensionInstallPath = Join-Path $env:ProgramFiles "EspressoLabs\chrome-extension"
 
-$tempExtractPath = Join-Path $tmpDir "temp-extract"
-Expand-Archive -Path $extensionDownloadPath -DestinationPath $tempExtractPath -Force | Out-Null
+  $tempExtractPath = Join-Path $tmpDir "temp-extract"
+  Expand-Archive -Path $extensionDownloadPath -DestinationPath $tempExtractPath -Force | Out-Null
 
 # Get the nested chrome-extension directory
-$nestedFolder = Join-Path $tempExtractPath "chrome-extension"
-if (-not (Test-Path $nestedFolder)) {
-    Write-Error "Expected chrome-extension directory not found in zip"
-    exit 1
-}
+  $nestedFolder = Join-Path $tempExtractPath "chrome-extension"
+  if (-not (Test-Path $nestedFolder)) {
+      Write-Error "Expected chrome-extension directory not found in zip"
+      exit 1
+  }
 
 # Create the extension directory if it doesn't exist
-if (-not (Test-Path $extensionInstallPath)) {
-    New-Item -ItemType Directory -Path $extensionInstallPath -Force
-}
+  if (-not (Test-Path $extensionInstallPath)) {
+      New-Item -ItemType Directory -Path $extensionInstallPath -Force
+  }
 
 # Copy all contents from the nested directory to the final location
-Get-ChildItem -Path $nestedFolder | Copy-Item -Destination $extensionInstallPath -Recurse -Force
+  Get-ChildItem -Path $nestedFolder | Copy-Item -Destination $extensionInstallPath -Recurse -Force
 
 # Clean up temp directory
-Remove-Item -Path $tempExtractPath -Recurse -Force
+  Remove-Item -Path $tempExtractPath -Recurse -Force
+
+
+  ohai "You can now enable the Chrome Extension"
+  Write-Host "    To enable the extension:"
+  Write-Host "     1. Open Chrome and navigate to 'chrome://extensions/'."
+  Write-Host "     2. Enable 'Developer mode' (toggle in the top-right corner)."
+  Write-Host "     3. Click 'Load unpacked' and select the folder: $extensionInstallPath"
+} else {
+    ohai "Skipping Chrome extension installation as per user request."
+}
 
 ohai "Installation completed successfully!"
 Write-Host "Installation log is available at: $logFile"
-
-ohai "You can now enable the Chrome Extension"
-Write-Host "    To enable the extension:"
-Write-Host "     1. Open Chrome and navigate to 'chrome://extensions/'."
-Write-Host "     2. Enable 'Developer mode' (toggle in the top-right corner)."
-Write-Host "     3. Click 'Load unpacked' and select the folder: $extensionInstallPath"
-

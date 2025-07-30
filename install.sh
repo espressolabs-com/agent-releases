@@ -73,6 +73,7 @@ Usage: [NONINTERACTIVE=1] [CI=1] install.sh [options]
     --backend-host   The backend that the agent will connect to.
     --token          The token that the agent will use to authenticate.
     --extension      Install the Chrome Extension
+    --bitdefender    Install Bitdefender (default: do not install Bitdefender)
     --no-jq          Do not install jq (default: install jq)
     -h, --help       Display this message.
     NONINTERACTIVE   Install without prompting for user input
@@ -106,6 +107,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --extension)
     INSTALL_EXTENSION=1
+    shift
+    ;;
+  --bitdefender)
+    INSTALL_BITDEFENDER=1
     shift
     ;;
   *)
@@ -329,6 +334,9 @@ fi
 if [[ -n "${INSTALL_EXTENSION-}" ]]; then
   echo "    - Chrome Extension"
 fi
+if [[ -n "${INSTALL_BITDEFENDER-}" ]]; then
+  echo "    - Bitdefender"
+fi
 
 if [[ -z "${NONINTERACTIVE-}" ]]; then
   ring_bell
@@ -392,7 +400,6 @@ if [[ -z "${NO_JQ-}" ]]; then
   else
     echo "JQ found in path"
   fi
-
 fi
 
 ohai "Downloading the latest release..."
@@ -455,4 +462,45 @@ if [[ -n "${INSTALL_EXTENSION-}" ]]; then
   echo "     3. Click 'Load unpacked' and select the folder: $EXTENSION_DESTINATION/chrome-extension"
 
 fi
+
+install_bitdefender() {
+  if [[ "${UNAME_MACHINE}" == "arm64" ]]; then
+    bitdefender_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/endpoint-security.arm64.pkg"
+  fi
+  if [[ "${UNAME_MACHINE}" == "x86_64" ]]; then
+    bitdefender_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/endpoint-security.intel.pkg"
+  fi
+  bitdefender_config_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/installer.xml"
+
+  local_bitdefender_path="/tmp/endpoint-security.pkg"
+  local_bitdefender_config_path="/tmp/installer.xml"
+
+  echo "Downloading Bitdefender from: $bitdefender_url"
+  curl -L --progress-bar "$bitdefender_url" -o "$local_bitdefender_path"
+  echo "Downloaded to $local_bitdefender_path"
+
+  cat <<EOF >"$local_bitdefender_config_path"
+<?xml version="1.0" encoding="utf-8"?>
+<config version="1.0">
+  <features>
+    <feature name="FileScan" action="1" />
+    <feature name="UserControl" action="1" />
+    <feature name="Antiphishing" action="1" />
+    <feature name="TrafficScan" action="1" />
+    <feature name="EventCorrelator" action="1" />
+  </features>
+</config>
+EOF
+
+  execute_sudo "$INSTALLER" "-pkg" "$local_bitdefender_path" "-target" "/"
+
+}
+
+if [[ -n "${INSTALL_BITDEFENDER-}" ]]; then
+  ohai "Installing Bitdefender..."
+  install_bitdefender
+
+  ohai "Bitdefender installed successfully!"
+fi
+
 ring_bell

@@ -470,7 +470,6 @@ install_bitdefender() {
   if [[ "${UNAME_MACHINE}" == "x86_64" ]]; then
     bitdefender_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/endpoint-security.intel.pkg"
   fi
-  bitdefender_config_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/installer.xml"
 
   local_bitdefender_path="/tmp/endpoint-security.pkg"
   local_bitdefender_config_path="/tmp/installer.xml"
@@ -479,6 +478,7 @@ install_bitdefender() {
   curl -L --progress-bar "$bitdefender_url" -o "$local_bitdefender_path"
   echo "Downloaded to $local_bitdefender_path"
 
+  # write the bitdefender config file next to the pkg
   cat <<EOF >"$local_bitdefender_config_path"
 <?xml version="1.0" encoding="utf-8"?>
 <config version="1.0">

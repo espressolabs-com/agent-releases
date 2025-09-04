@@ -407,7 +407,7 @@ get_latest_release
 
 execute_sudo "$INSTALLER" "-pkg" "$LOCAL_PKG_PATH" "-target" "/"
 
-execute_sudo "/Library/EspressoLabs/espresso-agent/$AGENT_VERSION/reconfigure.sh" "$BACKEND_HOST" "$TOKEN"
+execute_sudo "/Library/EspressoLabs/espresso-agent/reconfigure.sh" "$BACKEND_HOST" "$TOKEN"
 
 check_espresso_agent_version() {
   local expected_version="$1"

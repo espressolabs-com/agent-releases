@@ -463,6 +463,33 @@ if [[ -n "${INSTALL_EXTENSION-}" ]]; then
 
 fi
 
+BITDEFENDER_PKGS=(
+  "com.epsecurity.EndpointSecurityforMac.content_control"
+  "com.epsecurity.EndpointSecurityforMac"
+  "com.epsecurity.EndpointSecurityforMac.filescan"
+  "com.epsecurity.EndpointSecurityforMac.sigs-arm64"
+  "com.epsecurity.EndpointSecurityforMac.edr"
+)
+
+is_bitdefender_installed() {
+  # Check main directories
+  local bitdefender_path="/Library/oem/AVP/product/bin"
+  if [[ -d "$bitdefender_path" ]]; then
+    ohai "Bitdefender directory found: $bitdefender_path"
+    return 0
+  fi
+
+  # Check package receipts
+  for pkg in "${BITDEFENDER_PKGS[@]}"; do
+    if pkgutil --pkgs | grep -q "$pkg"; then
+      ohai "Bitdefender package receipt found: $pkg"
+      return 0
+    fi
+  done
+  ohai "Bitdefender not detected by package receipts or directories."
+  return 1
+}
+
 install_bitdefender() {
   if [[ "${UNAME_MACHINE}" == "arm64" ]]; then
     bitdefender_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/endpoint-security.arm64.pkg"
@@ -493,14 +520,16 @@ install_bitdefender() {
 EOF
 
   execute_sudo "$INSTALLER" "-pkg" "$local_bitdefender_path" "-target" "/"
-
 }
 
 if [[ -n "${INSTALL_BITDEFENDER-}" ]]; then
-  ohai "Installing Bitdefender..."
-  install_bitdefender
-
-  ohai "Bitdefender installed successfully!"
+  if is_bitdefender_installed; then
+    ohai "Bitdefender is already installed. Skipping installation."
+  else
+    ohai "Installing Bitdefender..."
+    install_bitdefender
+    ohai "Bitdefender installed successfully!"
+  fi
 fi
 
 ring_bell

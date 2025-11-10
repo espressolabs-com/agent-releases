@@ -478,10 +478,9 @@ is_bitdefender_installed() {
     ohai "Bitdefender directory found: $bitdefender_path"
     return 0
   fi
-
   # Check package receipts
   for pkg in "${BITDEFENDER_PKGS[@]}"; do
-    if pkgutil --pkgs | grep -q "$pkg"; then
+    if pkgutil --pkgs | grep -qE "^${pkg}$"; then
       ohai "Bitdefender package receipt found: $pkg"
       return 0
     fi

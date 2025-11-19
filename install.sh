@@ -431,6 +431,11 @@ check_espresso_agent_version() {
 ohai "Checking espresso-agent version..."
 check_espresso_agent_version "$AGENT_VERSION"
 
+ohai "Applying initial configuration..."
+execute_sudo "espresso-agent --token=$TOKEN --backend-host=$BACKEND_HOST --log-level=debug --log-file-enabled config.apply"
+echo "Restarting espresso-agent service..."
+execute_sudo "pkill espresso-agent"
+
 ohai "Installation successful!"
 
 get_latest_extension() {

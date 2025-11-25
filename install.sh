@@ -405,9 +405,13 @@ fi
 ohai "Downloading the latest release..."
 get_latest_release
 
-execute_sudo "$INSTALLER" "-pkg" "$LOCAL_PKG_PATH" "-target" "/"
+ohai "Creating configuration environment file..."
+cat <<EOF > "/tmp/espresso-agent.env"
+ESPRESSO_AGENT_BACKEND_HOST=$BACKEND_HOST
+ESPRESSO_AGENT_TOKEN=$TOKEN
+EOF
 
-execute_sudo "/Library/EspressoLabs/espresso-agent/reconfigure.sh" "$BACKEND_HOST" "$TOKEN"
+execute_sudo "$INSTALLER" "-pkg" "$LOCAL_PKG_PATH" "-target" "/"
 
 check_espresso_agent_version() {
   local expected_version="$1"

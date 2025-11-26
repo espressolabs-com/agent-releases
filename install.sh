@@ -405,11 +405,15 @@ fi
 ohai "Downloading the latest release..."
 get_latest_release
 
+# Create the configuration environment file with restricted permissions
 ohai "Creating configuration environment file..."
-cat <<EOF > "/tmp/espresso-agent.env"
+(
+  umask u=r,go=
+  cat <<EOF > "/tmp/espresso-agent.env"
 ESPRESSO_AGENT_BACKEND_HOST=$BACKEND_HOST
 ESPRESSO_AGENT_TOKEN=$TOKEN
 EOF
+)
 
 execute_sudo "$INSTALLER" "-pkg" "$LOCAL_PKG_PATH" "-target" "/"
 

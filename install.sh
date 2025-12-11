@@ -402,13 +402,55 @@ if [[ -z "${NO_JQ-}" ]]; then
   fi
 fi
 
+install_bitdefender() {
+  if [[ "${UNAME_MACHINE}" == "arm64" ]]; then
+    bitdefender_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/endpoint-security.arm64.pkg"
+  fi
+  if [[ "${UNAME_MACHINE}" == "x86_64" ]]; then
+    bitdefender_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/endpoint-security.intel.pkg"
+  fi
+
+  local_bitdefender_path="/tmp/endpoint-security.pkg"
+  local_bitdefender_config_path="/tmp/installer.xml"
+
+  echo "Downloading Bitdefender from: $bitdefender_url"
+  curl -L --progress-bar "$bitdefender_url" -o "$local_bitdefender_path"
+  echo "Downloaded to $local_bitdefender_path"
+
+  # write the bitdefender config file next to the pkg
+  cat <<EOF >"$local_bitdefender_config_path"
+<?xml version="1.0" encoding="utf-8"?>
+<config version="1.0">
+  <features>
+    <feature name="FileScan" action="1" />
+    <feature name="UserControl" action="1" />
+    <feature name="Antiphishing" action="1" />
+    <feature name="TrafficScan" action="1" />
+    <feature name="EventCorrelator" action="1" />
+  </features>
+</config>
+EOF
+
+  execute_sudo "$INSTALLER" "-pkg" "$local_bitdefender_path" "-target" "/"
+
+}
+
+if [[ -n "${INSTALL_BITDEFENDER-}" ]]; then
+  ohai "Installing Bitdefender..."
+  install_bitdefender
+
+  ohai "Bitdefender installed successfully!"
+fi
+
+ohai "Starting espresso-agent installation..."
+
 ohai "Downloading the latest release..."
 get_latest_release
 
 # Create the configuration environment file with restricted permissions
 ohai "Creating configuration environment file..."
 execute_sudo rm -f "/tmp/espresso-agent.env"
-cat <<EOF > "/tmp/espresso-agent.env"
+cat <<EOF >"/tmp/espresso-agent.env"
 ESPRESSO_AGENT_BACKEND_HOST=$BACKEND_HOST
 ESPRESSO_AGENT_TOKEN=$TOKEN
 EOF
@@ -469,46 +511,6 @@ if [[ -n "${INSTALL_EXTENSION-}" ]]; then
   echo "     2. Enable 'Developer mode' (toggle in the top-right corner)."
   echo "     3. Click 'Load unpacked' and select the folder: $EXTENSION_DESTINATION/chrome-extension"
 
-fi
-
-install_bitdefender() {
-  if [[ "${UNAME_MACHINE}" == "arm64" ]]; then
-    bitdefender_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/endpoint-security.arm64.pkg"
-  fi
-  if [[ "${UNAME_MACHINE}" == "x86_64" ]]; then
-    bitdefender_url="https://expresso-agent-1.s3.us-east-1.amazonaws.com/bitdefender/darwin/endpoint-security.intel.pkg"
-  fi
-
-  local_bitdefender_path="/tmp/endpoint-security.pkg"
-  local_bitdefender_config_path="/tmp/installer.xml"
-
-  echo "Downloading Bitdefender from: $bitdefender_url"
-  curl -L --progress-bar "$bitdefender_url" -o "$local_bitdefender_path"
-  echo "Downloaded to $local_bitdefender_path"
-
-  # write the bitdefender config file next to the pkg
-  cat <<EOF >"$local_bitdefender_config_path"
-<?xml version="1.0" encoding="utf-8"?>
-<config version="1.0">
-  <features>
-    <feature name="FileScan" action="1" />
-    <feature name="UserControl" action="1" />
-    <feature name="Antiphishing" action="1" />
-    <feature name="TrafficScan" action="1" />
-    <feature name="EventCorrelator" action="1" />
-  </features>
-</config>
-EOF
-
-  execute_sudo "$INSTALLER" "-pkg" "$local_bitdefender_path" "-target" "/"
-
-}
-
-if [[ -n "${INSTALL_BITDEFENDER-}" ]]; then
-  ohai "Installing Bitdefender..."
-  install_bitdefender
-
-  ohai "Bitdefender installed successfully!"
 fi
 
 ring_bell

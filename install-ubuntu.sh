@@ -297,10 +297,22 @@ EOABORT
   )"
 fi
 
+# Map UNAME_MACHINE to deb filename architecture pattern
+if [[ "${UNAME_MACHINE}" == "x86_64" ]]; then
+  DEB_ARCH="amd64"
+elif [[ "${UNAME_MACHINE}" == "aarch64" ]]; then
+  DEB_ARCH="arm64"
+else
+  abort "Unsupported architecture: ${UNAME_MACHINE}"
+fi
+
 get_latest_release() {
+  # Fetch the GitHub API response and filter for deb files matching the architecture
   deb_asset_url=$(curl --silent "https://api.github.com/repos/espressolabs-com/agent-releases/releases/latest" |
     grep -o '"browser_download_url": "[^"]*\.deb"' |
-    sed -E 's/.*"browser_download_url": "(.*)".*/\1/')
+    grep -i "${DEB_ARCH}" |
+    sed -E 's/.*"browser_download_url": "(.*)".*/\1/' |
+    head -n 1)
 
   if [[ -n "$deb_asset_url" ]]; then
     # Extract filename from the URL (e.g., "espresso-agent_0.11.0_linux_amd64.deb")
@@ -313,7 +325,7 @@ get_latest_release() {
     curl -L --progress-bar "$deb_asset_url" -o "$LOCAL_DEB_PATH"
     echo "Downloaded to $LOCAL_DEB_PATH"
   else
-    abort "No .deb asset found for the latest release."
+    abort "No .deb asset found for architecture ${DEB_ARCH} (${UNAME_MACHINE}) in the latest release."
   fi
 }
 

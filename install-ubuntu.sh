@@ -346,11 +346,7 @@ execute_sudo chown root "/tmp/espresso-agent.env"
 execute_sudo chmod u=r,go= "/tmp/espresso-agent.env"
 
 ohai "Installing espresso-agent package..."
-execute_sudo dpkg -i "$LOCAL_DEB_PATH" || {
-  # If dpkg fails due to missing dependencies, try to fix them
-  warn "Package installation had issues, attempting to fix dependencies..."
-  execute_sudo apt-get install -f -y
-}
+execute_sudo dpkg -i "$LOCAL_DEB_PATH"
 
 check_espresso_agent_version() {
   local expected_version="$1"

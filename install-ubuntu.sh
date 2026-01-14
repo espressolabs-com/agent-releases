@@ -296,6 +296,14 @@ Please run: sudo apt-get update && sudo apt-get install -y curl
 EOABORT
   )"
 fi
+if ! command -v gpg >/dev/null; then
+  abort "$(
+    cat <<EOABORT
+You must install GPG before installing the EspressoLabs Agent.
+Please run: sudo apt-get update && sudo apt-get install -y gnupg
+EOABORT
+  )"
+fi
 
 # Map UNAME_MACHINE to deb filename architecture pattern
 if [[ "${UNAME_MACHINE}" == "x86_64" ]]; then
@@ -306,9 +314,26 @@ else
   abort "Unsupported architecture: ${UNAME_MACHINE}"
 fi
 
+add_osquery_repo() {
+  # Install prerequisites
+  execute_sudo mkdir -p /etc/apt/keyrings
+
+  # Add GPG key
+  local temp_gpg="/tmp/osquery-pubkey.gpg"
+  execute curl -fL https://pkg.osquery.io/deb/pubkey.gpg -o "$temp_gpg"
+  execute_sudo gpg --yes --dearmor -o /etc/apt/keyrings/osquery.gpg "$temp_gpg"
+  rm -f "$temp_gpg"
+
+  # Add the repository
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/osquery.gpg] https://pkg.osquery.io/deb deb main" | execute_sudo tee /etc/apt/sources.list.d/osquery.list
+}
+
+ohai "Adding OSQuery apt repository..."
+add_osquery_repo
+
 get_latest_release() {
   # Fetch the GitHub API response and filter for deb files matching the architecture
-  deb_asset_url=$(curl --silent "https://api.github.com/repos/espressolabs-com/agent-releases/releases/latest" |
+  deb_asset_url=$(execute curl -fsSL "https://api.github.com/repos/espressolabs-com/agent-releases/releases/latest" |
     grep -o '"browser_download_url": "[^"]*\.deb"' |
     grep -i "${DEB_ARCH}" |
     sed -E 's/.*"browser_download_url": "(.*)".*/\1/' |
@@ -322,7 +347,7 @@ get_latest_release() {
 
     # Download the file to /tmp using the extracted filename
     echo "Downloading deb: $deb_asset_url"
-    curl -L --progress-bar "$deb_asset_url" -o "$LOCAL_DEB_PATH"
+    execute curl -fL --progress-bar "$deb_asset_url" -o "$LOCAL_DEB_PATH"
     echo "Downloaded to $LOCAL_DEB_PATH"
   else
     abort "No .deb asset found for architecture ${DEB_ARCH} (${UNAME_MACHINE}) in the latest release."

@@ -73,6 +73,7 @@ Usage: [NONINTERACTIVE=1] [CI=1] install.sh [options]
     --backend-host   The backend that the agent will connect to.
     --token          The token that the agent will use to authenticate.
     --extension      Install the Chrome Extension
+    --bitdefender    Install Bitdefender (override --no-bitdefender)
     --no-bitdefender Do not install Bitdefender (default: install Bitdefender)
     --no-jq          Do not install jq (default: install jq)
     -h, --help       Display this message.
@@ -114,7 +115,7 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   --bitdefender)
-    NO_BITDEFENDER=0
+    unset NO_BITDEFENDER
     shift
     ;;
   *)

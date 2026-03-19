@@ -73,7 +73,8 @@ Usage: [NONINTERACTIVE=1] [CI=1] install.sh [options]
     --backend-host   The backend that the agent will connect to.
     --token          The token that the agent will use to authenticate.
     --extension      Install the Chrome Extension
-    --bitdefender    Install Bitdefender (default: do not install Bitdefender)
+    --bitdefender    Install Bitdefender (override --no-bitdefender)
+    --no-bitdefender Do not install Bitdefender (default: install Bitdefender)
     --no-jq          Do not install jq (default: install jq)
     -h, --help       Display this message.
     NONINTERACTIVE   Install without prompting for user input
@@ -109,8 +110,12 @@ while [[ $# -gt 0 ]]; do
     INSTALL_EXTENSION=1
     shift
     ;;
+  --no-bitdefender)
+    NO_BITDEFENDER=1
+    shift
+    ;;
   --bitdefender)
-    INSTALL_BITDEFENDER=1
+    unset NO_BITDEFENDER
     shift
     ;;
   *)
@@ -334,7 +339,7 @@ fi
 if [[ -n "${INSTALL_EXTENSION-}" ]]; then
   echo "    - Chrome Extension"
 fi
-if [[ -n "${INSTALL_BITDEFENDER-}" ]]; then
+if [[ -z "${NO_BITDEFENDER-}" ]]; then
   echo "    - Bitdefender"
 fi
 
@@ -435,7 +440,7 @@ EOF
 
 }
 
-if [[ -n "${INSTALL_BITDEFENDER-}" ]]; then
+if [[ -z "${NO_BITDEFENDER-}" ]]; then
   ohai "Installing Bitdefender..."
   install_bitdefender
 

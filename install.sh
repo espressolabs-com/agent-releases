@@ -321,7 +321,7 @@ if [[ "${EUID:-${UID}}" != "0" ]] && ! have_sudo_access; then
     cat <<EOABORT
 Insufficient permissions to install the EspressoLabs Agent.
 
-Try again as an Adminstrator or user with sudo access.
+Try again as an Administrator or user with sudo access.
 EOABORT
   )"
 fi
@@ -502,7 +502,7 @@ get_latest_extension() {
 
   execute_sudo mkdir -p "$EXTENSION_DESTINATION"
   execute_sudo unzip -qq -o "$local_extension_path" -d "$EXTENSION_DESTINATION"
-  execute_sudo chmod -R 777 "$EXTENSION_DESTINATION/chrome-extension"
+  execute_sudo chmod -R u=rwX,go=rX "$EXTENSION_DESTINATION/chrome-extension"
 }
 
 if [[ -n "${INSTALL_EXTENSION-}" ]]; then
